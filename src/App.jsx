@@ -4,46 +4,65 @@ import './index.css'
 const HUMAN_HEIGHT_M = 1.7
 const VIEWPORT_HEIGHT_PX = window.innerHeight
 const HEADER_HEIGHT_PX = 64
-const GROUND_PADDING_PX = 48
+const GROUND_PADDING_PX = 56
 const CHART_HEIGHT_PX = VIEWPORT_HEIGHT_PX - HEADER_HEIGHT_PX - GROUND_PADDING_PX
-
-// How many px = 1 meter (based on fitting a ~human-height reference)
-const PX_PER_METER = CHART_HEIGHT_PX / 20 // tallest pokemon (wailord ~14.5m) fits with headroom
 
 const POKEMON_COUNT = 151 // Gen 1
 
 function PokemonCard({ pokemon, pxPerMeter }) {
   const heightPx = pokemon.height * pxPerMeter
-  const imgSize = Math.max(48, Math.min(heightPx * 0.9, 160))
+  const imgSize = Math.max(32, heightPx * 0.85)
 
   return (
     <div
       className="flex flex-col items-center justify-end"
-      style={{ height: CHART_HEIGHT_PX, minWidth: 80, paddingBottom: 8 }}
+      style={{ height: CHART_HEIGHT_PX, minWidth: 72, paddingBottom: 8 }}
     >
       <div
         className="flex flex-col items-center justify-end cursor-pointer group"
-        style={{ height: heightPx }}
+        style={{ height: heightPx, overflow: 'visible' }}
         title={`${pokemon.name} — ${pokemon.height}m`}
       >
-        <span
-          className="text-xs text-gray-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
-          style={{ fontSize: 10 }}
+        <div
+          className="opacity-0 group-hover:opacity-100 transition-opacity mb-1"
+          style={{
+            background: 'rgba(255,255,255,0.9)',
+            borderRadius: 99,
+            padding: '2px 8px',
+            fontSize: 10,
+            fontWeight: 700,
+            color: '#6d28d9',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+            whiteSpace: 'nowrap',
+          }}
         >
           {pokemon.height}m
-        </span>
+        </div>
         <img
           src={pokemon.sprite}
           alt={pokemon.name}
-          className="pokemon-img object-contain group-hover:brightness-125 transition-all"
+          className="pokemon-img object-contain transition-all group-hover:drop-shadow-lg group-hover:scale-105"
           style={{ width: imgSize, height: imgSize }}
         />
-        <span
-          className="text-center text-gray-400 mt-1 group-hover:text-white transition-colors capitalize"
-          style={{ fontSize: 11, maxWidth: 72, lineHeight: '1.2' }}
+        <div
+          className="text-center mt-1 capitalize transition-all"
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            maxWidth: 68,
+            lineHeight: '1.2',
+            background: 'rgba(255,255,255,0.75)',
+            borderRadius: 99,
+            padding: '2px 6px',
+            color: '#4c1d95',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
         >
           {pokemon.name}
-        </span>
+        </div>
       </div>
     </div>
   )
@@ -54,19 +73,61 @@ function HumanSilhouette({ pxPerMeter }) {
   return (
     <div
       className="flex flex-col items-center justify-end"
-      style={{ height: CHART_HEIGHT_PX, minWidth: 64, paddingBottom: 8 }}
+      style={{ height: CHART_HEIGHT_PX, minWidth: 56, paddingBottom: 8 }}
     >
       <div className="flex flex-col items-center justify-end" style={{ height: heightPx }}>
-        <span className="text-xs text-gray-600 mb-1" style={{ fontSize: 10 }}>1.7m</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 2 }}>1.7m</span>
         <svg width="28" height={heightPx - 20} viewBox="0 0 28 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="14" cy="7" r="6" fill="#374151" />
-          <rect x="10" y="14" width="8" height="28" rx="2" fill="#374151" />
-          <rect x="2" y="16" width="7" height="20" rx="2" fill="#374151" />
-          <rect x="19" y="16" width="7" height="20" rx="2" fill="#374151" />
-          <rect x="10" y="42" width="7" height="24" rx="2" fill="#374151" />
-          <rect x="11" y="42" width="7" height="24" rx="2" fill="#374151" />
+          <circle cx="14" cy="7" r="6" fill="#93c5fd" />
+          <rect x="10" y="14" width="8" height="28" rx="2" fill="#93c5fd" />
+          <rect x="2" y="16" width="7" height="20" rx="2" fill="#93c5fd" />
+          <rect x="19" y="16" width="7" height="20" rx="2" fill="#93c5fd" />
+          <rect x="10" y="42" width="7" height="24" rx="2" fill="#93c5fd" />
+          <rect x="11" y="42" width="7" height="24" rx="2" fill="#93c5fd" />
         </svg>
-        <span className="text-gray-600 mt-1" style={{ fontSize: 10 }}>human</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', marginTop: 2 }}>human</span>
+      </div>
+    </div>
+  )
+}
+
+function PokeballLoader({ progress }) {
+  return (
+    <div className="flex flex-col items-center justify-center flex-1 gap-5">
+      {/* Bouncing pokeball */}
+      <div className="bounce-load" style={{ width: 48, height: 48 }}>
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="24" cy="24" r="22" fill="white" stroke="#e2e8f0" strokeWidth="2" />
+          <path d="M2 24 Q2 2 24 2 Q46 2 46 24" fill="#f87171" />
+          <line x1="2" y1="24" x2="46" y2="24" stroke="#1e293b" strokeWidth="2.5" />
+          <circle cx="24" cy="24" r="7" fill="white" stroke="#1e293b" strokeWidth="2.5" />
+          <circle cx="24" cy="24" r="3.5" fill="#f1f5f9" />
+        </svg>
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: '#4c1d95' }}>
+        Loading Pokémon…
+      </div>
+      <div
+        style={{
+          width: 220,
+          height: 10,
+          background: '#ddd6fe',
+          borderRadius: 99,
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            width: `${(progress / POKEMON_COUNT) * 100}%`,
+            background: 'linear-gradient(to right, #a78bfa, #f472b6)',
+            borderRadius: 99,
+            transition: 'width 0.3s',
+          }}
+        />
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#7c3aed' }}>
+        {progress} / {POKEMON_COUNT}
       </div>
     </div>
   )
@@ -150,35 +211,70 @@ export default function App() {
   const pxPerMeter = CHART_HEIGHT_PX / (tallest * 1.15)
 
   return (
-    <div className="flex flex-col" style={{ height: '100vh', background: '#0f0f1a' }}>
+    <div
+      className="flex flex-col"
+      style={{
+        height: '100vh',
+        background: 'linear-gradient(to bottom, #bfdbfe 0%, #ddd6fe 60%, #c7d2fe 100%)',
+      }}
+    >
       {/* Header */}
       <header
-        className="flex items-center justify-between px-8 shrink-0 border-b border-white/5"
-        style={{ height: HEADER_HEIGHT_PX }}
+        className="flex items-center justify-between px-8 shrink-0"
+        style={{
+          height: HEADER_HEIGHT_PX,
+          background: 'rgba(255,255,255,0.55)',
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(255,255,255,0.6)',
+          boxShadow: '0 1px 8px rgba(167,139,250,0.12)',
+        }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-2xl font-bold text-white tracking-tight">PokéSize</span>
-          <span className="text-xs text-gray-500 uppercase tracking-widest">Gen I height chart</span>
+          <span
+            style={{
+              fontSize: 22,
+              fontWeight: 800,
+              background: 'linear-gradient(to right, #7c3aed, #ec4899)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.5px',
+            }}
+          >
+            PokéSize ✨
+          </span>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: '#7c3aed',
+              background: '#ede9fe',
+              borderRadius: 99,
+              padding: '2px 10px',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Gen I
+          </span>
         </div>
         {!loading && (
-          <span className="text-xs text-gray-600">
-            Scroll → to reveal taller Pokémon · Drag to pan
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#7c3aed',
+              background: 'rgba(237,233,254,0.8)',
+              borderRadius: 99,
+              padding: '4px 12px',
+            }}
+          >
+            Scroll → to see taller Pokémon · Drag to pan
           </span>
         )}
       </header>
 
       {/* Main */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center flex-1 gap-4">
-          <div className="text-gray-400 text-sm">Loading Pokémon data…</div>
-          <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-indigo-500 rounded-full transition-all"
-              style={{ width: `${(progress / POKEMON_COUNT) * 100}%` }}
-            />
-          </div>
-          <div className="text-gray-600 text-xs">{progress} / {POKEMON_COUNT}</div>
-        </div>
+        <PokeballLoader progress={progress} />
       ) : (
         <div
           ref={scrollRef}
@@ -194,13 +290,13 @@ export default function App() {
               paddingBottom: GROUND_PADDING_PX,
             }}
           >
-            {/* Ground line */}
+            {/* Grass ground */}
             <div
               className="absolute bottom-0 left-0 right-0"
               style={{
                 height: GROUND_PADDING_PX,
-                borderTop: '1px solid rgba(255,255,255,0.07)',
-                background: 'linear-gradient(to top, rgba(99,102,241,0.05), transparent)',
+                background: 'linear-gradient(to top, #86efac, #bbf7d0)',
+                borderTop: '3px solid #4ade80',
               }}
             />
 
@@ -214,10 +310,22 @@ export default function App() {
                   className="absolute left-0 right-0 flex items-center"
                   style={{ bottom: GROUND_PADDING_PX + m * pxPerMeter }}
                 >
-                  <div className="w-full border-t border-white/5 border-dashed" />
+                  <div
+                    className="w-full"
+                    style={{ borderTop: '1px dashed rgba(99,102,241,0.18)' }}
+                  />
                   <span
-                    className="text-gray-700 shrink-0 pl-2"
-                    style={{ fontSize: 10, position: 'absolute', left: 4 }}
+                    style={{
+                      position: 'absolute',
+                      left: 6,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: '#6d28d9',
+                      background: 'rgba(255,255,255,0.75)',
+                      borderRadius: 99,
+                      padding: '1px 6px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.07)',
+                    }}
                   >
                     {m}m
                   </span>
@@ -226,23 +334,23 @@ export default function App() {
             })}
 
             {/* Human reference */}
-            <div className="mr-6 shrink-0">
+            <div className="mr-4 shrink-0 relative z-10">
               <HumanSilhouette pxPerMeter={pxPerMeter} />
             </div>
 
             {/* Divider */}
             <div
-              className="shrink-0 mr-6"
+              className="shrink-0 mr-4"
               style={{
                 width: 1,
                 height: CHART_HEIGHT_PX,
-                background: 'rgba(255,255,255,0.06)',
+                background: 'rgba(124,58,237,0.15)',
               }}
             />
 
             {/* Pokémon */}
             {pokemon.map((p) => (
-              <div key={p.id} className="mx-1 shrink-0">
+              <div key={p.id} className="mx-1 shrink-0 relative z-10" style={{ overflow: 'visible' }}>
                 <PokemonCard pokemon={p} pxPerMeter={pxPerMeter} />
               </div>
             ))}

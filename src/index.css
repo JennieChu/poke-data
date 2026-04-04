@@ -7,9 +7,9 @@
 }
 
 body {
-  background-color: #0f0f1a;
-  color: white;
-  font-family: 'Segoe UI', sans-serif;
+  background-color: #bfdbfe;
+  color: #1e293b;
+  font-family: 'Nunito', 'Segoe UI', sans-serif;
   overflow: hidden;
   height: 100vh;
 }
@@ -24,7 +24,7 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
-  scrollbar-color: #4a4a6a #1a1a2e;
+  scrollbar-color: #c4b5fd #e0e7ff;
 }
 
 .scroll-container::-webkit-scrollbar {
@@ -32,14 +32,23 @@ body {
 }
 
 .scroll-container::-webkit-scrollbar-track {
-  background: #1a1a2e;
+  background: #e0e7ff;
 }
 
 .scroll-container::-webkit-scrollbar-thumb {
-  background: #4a4a6a;
+  background: #c4b5fd;
   border-radius: 4px;
 }
 
 .pokemon-img {
   image-rendering: pixelated;
+}
+
+@keyframes bounce-load {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+.bounce-load {
+  animation: bounce-load 0.8s ease-in-out infinite;
 }
