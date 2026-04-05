@@ -5,10 +5,22 @@ const POKEMON_COUNT = 151
 const MAX_HEIGHT_M = 15
 const PX_PER_METER = 800
 const TOTAL_HEIGHT_PX = MAX_HEIGHT_M * PX_PER_METER
-const GAUGE_WIDTH = 88
+const GAUGE_WIDTH = 176
 const HUMAN_HEIGHT_M = 1.7
 const NUM_LANES = 3
 const LANE_GAP = 20 // min vertical gap between items in same lane
+
+// Real-world height references (heights in metres, factual)
+const REFERENCES = [
+  { h: 0.25, emoji: '🐱', label: 'house cat' },
+  { h: 0.46, emoji: '🎳', label: 'bowling pin' },
+  { h: 0.63, emoji: '🐕', label: 'golden retriever' },
+  { h: 1.00, emoji: '🧒', label: '5-yr-old child' },
+  { h: 2.10, emoji: '🚪', label: 'standard door' },
+  { h: 3.05, emoji: '🏀', label: 'basketball hoop' },
+  { h: 5.00, emoji: '🦒', label: 'giraffe' },
+  { h: 8.50, emoji: '🏠', label: '2-story house' },
+]
 
 // Pre-compute non-overlapping positions using lane assignment.
 // pokemon must already be sorted by height ascending.
@@ -128,21 +140,28 @@ function PokeballLoader({ progress }) {
   )
 }
 
+// Converts a real-world height (metres) to its viewport y position in the gauge
+function heightToGaugeY(h, scrollY) {
+  return (TOTAL_HEIGHT_PX - h * PX_PER_METER) - scrollY
+}
+
 function HeightGauge({ scrollY, currentHeightM, windowHeight }) {
   const zone = getZone(currentHeightM)
+
   const ticks = []
-  // Generate ticks every 0.5m
   for (let m = 0; m <= MAX_HEIGHT_M; m += 0.5) {
     const isMajor = Number.isInteger(m)
-    const pxFromBottom = m * PX_PER_METER
-    // Position tick relative to gauge — maps scroll position to gauge position
-    // We want: tick at height m appears at gauge y = viewport center when scrollY makes currentHeightM = m
-    // Tick's absolute scroll position: TOTAL_HEIGHT_PX - pxFromBottom
-    // Its position in the gauge = (tickScrollPos - scrollY) mapped to viewport
-    const tickViewportY = (TOTAL_HEIGHT_PX - pxFromBottom) - scrollY
-    if (tickViewportY < -20 || tickViewportY > windowHeight + 20) continue
-    ticks.push({ m, isMajor, y: tickViewportY })
+    const y = heightToGaugeY(m, scrollY)
+    if (y < -20 || y > windowHeight + 20) continue
+    ticks.push({ m, isMajor, y })
   }
+
+  const visibleRefs = REFERENCES
+    .map(r => ({ ...r, y: heightToGaugeY(r.h, scrollY) }))
+    .filter(r => r.y >= -30 && r.y <= windowHeight + 30)
+
+  const humanY = heightToGaugeY(HUMAN_HEIGHT_M, scrollY)
+  const humanVisible = humanY >= -60 && humanY <= windowHeight + 60
 
   return (
     <div
@@ -152,8 +171,8 @@ function HeightGauge({ scrollY, currentHeightM, windowHeight }) {
         top: 0,
         width: GAUGE_WIDTH,
         height: '100vh',
-        background: 'rgba(10, 7, 3, 0.88)',
-        backdropFilter: 'blur(8px)',
+        background: 'rgba(10, 7, 3, 0.92)',
+        backdropFilter: 'blur(10px)',
         borderRight: '1px solid rgba(240,235,224,0.08)',
         zIndex: 100,
         overflow: 'hidden',
@@ -161,121 +180,214 @@ function HeightGauge({ scrollY, currentHeightM, windowHeight }) {
         flexDirection: 'column',
       }}
     >
-      {/* Current height readout */}
+      {/* Header: current height readout + zone */}
       <div
         style={{
-          padding: '16px 12px 12px',
-          borderBottom: '1px solid rgba(240,235,224,0.08)',
+          padding: '20px 16px 16px',
+          borderBottom: '1px solid rgba(240,235,224,0.07)',
           flexShrink: 0,
         }}
       >
-        <div style={{ fontSize: 9, letterSpacing: '0.12em', color: '#6b5a42', marginBottom: 4, textTransform: 'uppercase' }}>
+        <div style={{
+          fontSize: 9,
+          letterSpacing: '0.15em',
+          color: '#5a4a32',
+          marginBottom: 8,
+          textTransform: 'uppercase',
+          fontFamily: "'DM Mono', monospace",
+        }}>
           Height
         </div>
-        <div
-          style={{
-            fontSize: 22,
-            fontWeight: 500,
-            color: zone.accent,
-            letterSpacing: '-0.5px',
-            lineHeight: 1,
-            transition: 'color 0.6s ease',
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
+        <div style={{
+          fontSize: 36,
+          fontWeight: 500,
+          color: zone.accent,
+          letterSpacing: '-1px',
+          lineHeight: 1,
+          transition: 'color 0.6s ease',
+          fontVariantNumeric: 'tabular-nums',
+          fontFamily: "'DM Mono', monospace",
+        }}>
           {currentHeightM.toFixed(1)}
-          <span style={{ fontSize: 11, color: '#a09070', marginLeft: 3 }}>m</span>
+          <span style={{ fontSize: 14, color: '#6a5840', marginLeft: 4, letterSpacing: 0 }}>m</span>
+        </div>
+        <div style={{
+          marginTop: 8,
+          fontSize: 11,
+          fontFamily: "'Fraunces', serif",
+          fontStyle: 'italic',
+          color: zone.accent,
+          opacity: 0.7,
+          transition: 'color 0.6s ease',
+          letterSpacing: '0.01em',
+        }}>
+          {zone.name}
         </div>
       </div>
 
-      {/* Tick ruler — fills remaining space */}
+      {/* Ruler — ticks + reference marks */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+
+        {/* Regular tick marks */}
         {ticks.map(({ m, isMajor, y }) => (
-          <div key={m} style={{ position: 'absolute', top: y, left: 0, right: 0, display: 'flex', alignItems: 'center' }}>
+          <div
+            key={m}
+            style={{ position: 'absolute', top: y, left: 0, right: 0, display: 'flex', alignItems: 'center' }}
+          >
             {isMajor && (
-              <span
-                style={{
-                  fontSize: 9,
-                  fontFamily: "'DM Mono', monospace",
-                  color: 'rgba(240,235,224,0.45)',
-                  paddingLeft: 8,
-                  paddingRight: 4,
-                  lineHeight: 1,
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >
+              <span style={{
+                fontSize: 10,
+                fontFamily: "'DM Mono', monospace",
+                color: 'rgba(240,235,224,0.35)',
+                paddingLeft: 12,
+                lineHeight: 1,
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}>
                 {m}m
               </span>
             )}
-            <div
-              style={{
-                position: 'absolute',
-                right: 0,
-                height: 1,
-                width: isMajor ? 20 : 10,
-                background: isMajor ? 'rgba(240,235,224,0.4)' : 'rgba(240,235,224,0.15)',
-              }}
-            />
+            <div style={{
+              position: 'absolute',
+              right: 0,
+              height: 1,
+              width: isMajor ? 24 : 12,
+              background: isMajor ? 'rgba(240,235,224,0.3)' : 'rgba(240,235,224,0.12)',
+            }} />
+          </div>
+        ))}
+
+        {/* Real-world reference marks */}
+        {visibleRefs.map((ref) => (
+          <div
+            key={ref.h}
+            style={{
+              position: 'absolute',
+              top: ref.y,
+              left: 0,
+              right: 0,
+              transform: 'translateY(-50%)',
+              pointerEvents: 'none',
+              zIndex: 2,
+            }}
+          >
+            {/* Full-width accent line */}
+            <div style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              height: 1,
+              background: 'rgba(240,235,224,0.12)',
+            }} />
+            {/* Emoji + label row */}
+            <div style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              paddingLeft: 10,
+              paddingTop: 3,
+            }}>
+              <span style={{ fontSize: 15, lineHeight: 1, flexShrink: 0 }}>{ref.emoji}</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{
+                  fontSize: 10,
+                  fontFamily: "'DM Mono', monospace",
+                  color: 'rgba(240,235,224,0.6)',
+                  letterSpacing: '0.03em',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}>
+                  {ref.label}
+                </div>
+                <div style={{
+                  fontSize: 8,
+                  fontFamily: "'DM Mono', monospace",
+                  color: 'rgba(240,235,224,0.25)',
+                  letterSpacing: '0.04em',
+                  marginTop: 1,
+                }}>
+                  {ref.h} m
+                </div>
+              </div>
+            </div>
           </div>
         ))}
 
         {/* Human reference mark */}
-        {(() => {
-          const humanScrollPos = TOTAL_HEIGHT_PX - HUMAN_HEIGHT_M * PX_PER_METER
-          const humanY = humanScrollPos - scrollY
-          if (humanY < 0 || humanY > windowHeight) return null
-          return (
-            <div
-              style={{
-                position: 'absolute',
-                top: humanY,
-                left: 0,
-                right: 0,
-                display: 'flex',
-                alignItems: 'flex-end',
-                pointerEvents: 'none',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  height: 1,
-                  width: GAUGE_WIDTH,
-                  background: 'rgba(140, 200, 100, 0.5)',
-                }}
-              />
-              <svg
-                width="22"
-                height="44"
-                viewBox="0 0 22 60"
-                style={{ position: 'absolute', right: 22, bottom: 0 }}
-              >
-                <circle cx="11" cy="6" r="5" fill="#8fcf5a" opacity="0.8" />
-                <rect x="7" y="12" width="8" height="22" rx="2" fill="#8fcf5a" opacity="0.8" />
-                <rect x="1" y="14" width="6" height="16" rx="2" fill="#8fcf5a" opacity="0.8" />
-                <rect x="15" y="14" width="6" height="16" rx="2" fill="#8fcf5a" opacity="0.8" />
-                <rect x="7" y="34" width="5" height="18" rx="2" fill="#8fcf5a" opacity="0.8" />
-                <rect x="10" y="34" width="5" height="18" rx="2" fill="#8fcf5a" opacity="0.8" />
+        {humanVisible && (
+          <div
+            style={{
+              position: 'absolute',
+              top: humanY,
+              left: 0,
+              right: 0,
+              transform: 'translateY(-100%)',
+              pointerEvents: 'none',
+              zIndex: 3,
+            }}
+          >
+            {/* Green accent line */}
+            <div style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 1,
+              background: 'rgba(143, 207, 90, 0.55)',
+            }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: 8,
+              paddingLeft: 10,
+              paddingBottom: 4,
+            }}>
+              <svg width="18" height="36" viewBox="0 0 18 48" fill="none">
+                <circle cx="9" cy="5" r="4" fill="#8fcf5a" opacity="0.85" />
+                <rect x="5" y="10" width="8" height="18" rx="2" fill="#8fcf5a" opacity="0.85" />
+                <rect x="0" y="12" width="6" height="13" rx="2" fill="#8fcf5a" opacity="0.85" />
+                <rect x="12" y="12" width="6" height="13" rx="2" fill="#8fcf5a" opacity="0.85" />
+                <rect x="5" y="28" width="4" height="14" rx="2" fill="#8fcf5a" opacity="0.85" />
+                <rect x="9" y="28" width="4" height="14" rx="2" fill="#8fcf5a" opacity="0.85" />
               </svg>
+              <div>
+                <div style={{
+                  fontSize: 10,
+                  fontFamily: "'DM Mono', monospace",
+                  color: '#8fcf5a',
+                  letterSpacing: '0.03em',
+                  opacity: 0.85,
+                }}>
+                  avg. human
+                </div>
+                <div style={{
+                  fontSize: 8,
+                  fontFamily: "'DM Mono', monospace",
+                  color: 'rgba(143,207,90,0.45)',
+                  letterSpacing: '0.04em',
+                  marginTop: 1,
+                }}>
+                  1.7 m
+                </div>
+              </div>
             </div>
-          )
-        })()}
+          </div>
+        )}
       </div>
 
-      {/* Zone color bar at bottom */}
-      <div
-        style={{
-          height: 3,
-          background: zone.accent,
-          transition: 'background 0.8s ease',
-          flexShrink: 0,
-        }}
-      />
+      {/* Zone accent bar at bottom */}
+      <div style={{
+        height: 3,
+        background: zone.accent,
+        transition: 'background 0.8s ease',
+        flexShrink: 0,
+      }} />
     </div>
   )
 }
+
 
 function ZoneLabel({ currentZone }) {
   return (
@@ -321,9 +433,9 @@ function ZoneLabel({ currentZone }) {
 // lane 1: center column, label right
 // lane 2: right column, label left
 const LANE_CONFIG = [
-  { posStyle: { left: GAUGE_WIDTH + 32 },         labelAlign: 'left',  flexDir: 'row' },
-  { posStyle: { left: 'calc(33% + 60px)' },        labelAlign: 'left',  flexDir: 'row' },
-  { posStyle: { right: 32 },                        labelAlign: 'right', flexDir: 'row-reverse' },
+  { posStyle: { left: GAUGE_WIDTH + 24 },           labelAlign: 'left',  flexDir: 'row' },
+  { posStyle: { left: 'calc(50% + 30px)' },          labelAlign: 'left',  flexDir: 'row' },
+  { posStyle: { right: 24 },                         labelAlign: 'right', flexDir: 'row-reverse' },
 ]
 
 function PokemonEntry({ pokemon, computedTop, lane, spriteSize }) {
