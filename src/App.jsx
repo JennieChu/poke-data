@@ -1,149 +1,448 @@
 import { useState, useEffect, useRef } from 'react'
 import './index.css'
 
+const POKEMON_COUNT = 151
+const MAX_HEIGHT_M = 15
+const PX_PER_METER = 800
+const TOTAL_HEIGHT_PX = MAX_HEIGHT_M * PX_PER_METER
+const GAUGE_WIDTH = 88
 const HUMAN_HEIGHT_M = 1.7
-const VIEWPORT_HEIGHT_PX = window.innerHeight
-const HEADER_HEIGHT_PX = 64
-const GROUND_PADDING_PX = 56
-const CHART_HEIGHT_PX = VIEWPORT_HEIGHT_PX - HEADER_HEIGHT_PX - GROUND_PADDING_PX
+const NUM_LANES = 3
+const LANE_GAP = 20 // min vertical gap between items in same lane
 
-const POKEMON_COUNT = 151 // Gen 1
+// Pre-compute non-overlapping positions using lane assignment.
+// pokemon must already be sorted by height ascending.
+function computePositions(pokemonList) {
+  const laneBottoms = Array(NUM_LANES).fill(-Infinity)
 
-function PokemonCard({ pokemon, pxPerMeter }) {
-  const heightPx = pokemon.height * pxPerMeter
-  const imgSize = Math.max(32, heightPx * 0.85)
+  return pokemonList.map((p) => {
+    const spriteSize = Math.min(220, Math.max(48, p.height * 52))
+    const itemHeight = spriteSize + 76 // sprite + name + height label + dex number + gaps
+    const idealTop = (p.height / MAX_HEIGHT_M) * TOTAL_HEIGHT_PX - spriteSize / 2
 
-  return (
-    <div
-      className="flex flex-col items-center justify-end"
-      style={{ height: CHART_HEIGHT_PX, minWidth: 72, paddingBottom: 8 }}
-    >
-      <div
-        className="flex flex-col items-center justify-end cursor-pointer group"
-        style={{ height: heightPx, overflow: 'visible' }}
-        title={`${pokemon.name} — ${pokemon.height}m`}
-      >
-        <div
-          className="opacity-0 group-hover:opacity-100 transition-opacity mb-1"
-          style={{
-            background: 'rgba(255,255,255,0.9)',
-            borderRadius: 99,
-            padding: '2px 8px',
-            fontSize: 10,
-            fontWeight: 700,
-            color: '#6d28d9',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {pokemon.height}m
-        </div>
-        <img
-          src={pokemon.sprite}
-          alt={pokemon.name}
-          className="pokemon-img object-contain transition-all group-hover:drop-shadow-lg group-hover:scale-105"
-          style={{ width: imgSize, height: imgSize }}
-        />
-        <div
-          className="text-center mt-1 capitalize transition-all"
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            maxWidth: 68,
-            lineHeight: '1.2',
-            background: 'rgba(255,255,255,0.75)',
-            borderRadius: 99,
-            padding: '2px 6px',
-            color: '#4c1d95',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {pokemon.name}
-        </div>
-      </div>
-    </div>
-  )
+    // Pick the lane that lets us place this item closest to its ideal position
+    let bestLane = 0
+    let bestTop = Infinity
+    for (let l = 0; l < NUM_LANES; l++) {
+      const candidate = Math.max(idealTop, laneBottoms[l] + LANE_GAP)
+      if (candidate < bestTop) {
+        bestTop = candidate
+        bestLane = l
+      }
+    }
+
+    laneBottoms[bestLane] = bestTop + itemHeight
+    return { ...p, computedTop: bestTop, lane: bestLane, spriteSize }
+  })
 }
 
-function HumanSilhouette({ pxPerMeter }) {
-  const heightPx = HUMAN_HEIGHT_M * pxPerMeter
-  return (
-    <div
-      className="flex flex-col items-center justify-end"
-      style={{ height: CHART_HEIGHT_PX, minWidth: 56, paddingBottom: 8 }}
-    >
-      <div className="flex flex-col items-center justify-end" style={{ height: heightPx }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 2 }}>1.7m</span>
-        <svg width="28" height={heightPx - 20} viewBox="0 0 28 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="14" cy="7" r="6" fill="#93c5fd" />
-          <rect x="10" y="14" width="8" height="28" rx="2" fill="#93c5fd" />
-          <rect x="2" y="16" width="7" height="20" rx="2" fill="#93c5fd" />
-          <rect x="19" y="16" width="7" height="20" rx="2" fill="#93c5fd" />
-          <rect x="10" y="42" width="7" height="24" rx="2" fill="#93c5fd" />
-          <rect x="11" y="42" width="7" height="24" rx="2" fill="#93c5fd" />
-        </svg>
-        <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', marginTop: 2 }}>human</span>
-      </div>
-    </div>
-  )
+const ZONES = [
+  {
+    min: 0,
+    max: 0.5,
+    name: 'Underground',
+    sub: '0 – 0.5 m',
+    bg: 'linear-gradient(to bottom, #1a1209 0%, #2d1f0e 40%, #3d2a12 100%)',
+    accent: '#a0764a',
+  },
+  {
+    min: 0.5,
+    max: 2,
+    name: 'Ground Level',
+    sub: '0.5 – 2 m',
+    bg: 'linear-gradient(to bottom, #2d4a1e 0%, #3d6b28 30%, #4a7a30 60%, #5c8c3a 100%)',
+    accent: '#8fcf5a',
+  },
+  {
+    min: 2,
+    max: 5,
+    name: 'Forest',
+    sub: '2 – 5 m',
+    bg: 'linear-gradient(to bottom, #1a3d1a 0%, #1e4a22 30%, #16391a 70%, #122e16 100%)',
+    accent: '#5dba6a',
+  },
+  {
+    min: 5,
+    max: 10,
+    name: 'Open Sky',
+    sub: '5 – 10 m',
+    bg: 'linear-gradient(to bottom, #1a3a5c 0%, #1e5080 30%, #2060a0 60%, #2a70b8 100%)',
+    accent: '#7ec8f0',
+  },
+  {
+    min: 10,
+    max: 15,
+    name: 'High Altitude',
+    sub: '10 – 15 m',
+    bg: 'linear-gradient(to bottom, #2a70b8 0%, #4a8fcc 30%, #a0c8e8 60%, #d8ecf8 100%)',
+    accent: '#e0f4ff',
+  },
+]
+
+function getZone(heightM) {
+  return ZONES.find(z => heightM >= z.min && heightM < z.max) ?? ZONES[ZONES.length - 1]
 }
 
 function PokeballLoader({ progress }) {
   return (
-    <div className="flex flex-col items-center justify-center flex-1 gap-5">
-      {/* Bouncing pokeball */}
-      <div className="bounce-load" style={{ width: 48, height: 48 }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: '#0f0a06',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 24,
+        zIndex: 1000,
+      }}
+    >
+      <div className="bounce-load" style={{ width: 52, height: 52 }}>
         <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="24" cy="24" r="22" fill="white" stroke="#e2e8f0" strokeWidth="2" />
-          <path d="M2 24 Q2 2 24 2 Q46 2 46 24" fill="#f87171" />
-          <line x1="2" y1="24" x2="46" y2="24" stroke="#1e293b" strokeWidth="2.5" />
-          <circle cx="24" cy="24" r="7" fill="white" stroke="#1e293b" strokeWidth="2.5" />
-          <circle cx="24" cy="24" r="3.5" fill="#f1f5f9" />
+          <circle cx="24" cy="24" r="22" fill="#1a1209" stroke="#3d2a12" strokeWidth="2" />
+          <path d="M2 24 Q2 2 24 2 Q46 2 46 24" fill="#c0392b" />
+          <line x1="2" y1="24" x2="46" y2="24" stroke="#f0ebe0" strokeWidth="2" />
+          <circle cx="24" cy="24" r="7" fill="#1a1209" stroke="#f0ebe0" strokeWidth="2" />
+          <circle cx="24" cy="24" r="3.5" fill="#2d1f0e" />
         </svg>
       </div>
-      <div style={{ fontSize: 15, fontWeight: 700, color: '#4c1d95' }}>
+      <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600, color: '#f0ebe0', letterSpacing: '-0.3px' }}>
         Loading Pokémon…
       </div>
-      <div
-        style={{
-          width: 220,
-          height: 10,
-          background: '#ddd6fe',
-          borderRadius: 99,
-          overflow: 'hidden',
-        }}
-      >
+      <div style={{ width: 200, height: 3, background: '#2d1f0e', borderRadius: 99, overflow: 'hidden' }}>
         <div
           style={{
             height: '100%',
             width: `${(progress / POKEMON_COUNT) * 100}%`,
-            background: 'linear-gradient(to right, #a78bfa, #f472b6)',
+            background: 'linear-gradient(to right, #a0764a, #c0392b)',
             borderRadius: 99,
             transition: 'width 0.3s',
           }}
         />
       </div>
-      <div style={{ fontSize: 12, fontWeight: 600, color: '#7c3aed' }}>
+      <div style={{ fontSize: 11, color: '#6b5a42', fontFamily: "'DM Mono', monospace" }}>
         {progress} / {POKEMON_COUNT}
       </div>
     </div>
   )
 }
 
+function HeightGauge({ scrollY, currentHeightM, windowHeight }) {
+  const zone = getZone(currentHeightM)
+  const ticks = []
+  // Generate ticks every 0.5m
+  for (let m = 0; m <= MAX_HEIGHT_M; m += 0.5) {
+    const isMajor = Number.isInteger(m)
+    const pxFromBottom = m * PX_PER_METER
+    // Position tick relative to gauge — maps scroll position to gauge position
+    // We want: tick at height m appears at gauge y = viewport center when scrollY makes currentHeightM = m
+    // Tick's absolute scroll position: TOTAL_HEIGHT_PX - pxFromBottom
+    // Its position in the gauge = (tickScrollPos - scrollY) mapped to viewport
+    const tickViewportY = (TOTAL_HEIGHT_PX - pxFromBottom) - scrollY
+    if (tickViewportY < -20 || tickViewportY > windowHeight + 20) continue
+    ticks.push({ m, isMajor, y: tickViewportY })
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        left: 0,
+        top: 0,
+        width: GAUGE_WIDTH,
+        height: '100vh',
+        background: 'rgba(10, 7, 3, 0.88)',
+        backdropFilter: 'blur(8px)',
+        borderRight: '1px solid rgba(240,235,224,0.08)',
+        zIndex: 100,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Current height readout */}
+      <div
+        style={{
+          padding: '16px 12px 12px',
+          borderBottom: '1px solid rgba(240,235,224,0.08)',
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ fontSize: 9, letterSpacing: '0.12em', color: '#6b5a42', marginBottom: 4, textTransform: 'uppercase' }}>
+          Height
+        </div>
+        <div
+          style={{
+            fontSize: 22,
+            fontWeight: 500,
+            color: zone.accent,
+            letterSpacing: '-0.5px',
+            lineHeight: 1,
+            transition: 'color 0.6s ease',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {currentHeightM.toFixed(1)}
+          <span style={{ fontSize: 11, color: '#a09070', marginLeft: 3 }}>m</span>
+        </div>
+      </div>
+
+      {/* Tick ruler — fills remaining space */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {ticks.map(({ m, isMajor, y }) => (
+          <div key={m} style={{ position: 'absolute', top: y, left: 0, right: 0, display: 'flex', alignItems: 'center' }}>
+            {isMajor && (
+              <span
+                style={{
+                  fontSize: 9,
+                  fontFamily: "'DM Mono', monospace",
+                  color: 'rgba(240,235,224,0.45)',
+                  paddingLeft: 8,
+                  paddingRight: 4,
+                  lineHeight: 1,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                {m}m
+              </span>
+            )}
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                height: 1,
+                width: isMajor ? 20 : 10,
+                background: isMajor ? 'rgba(240,235,224,0.4)' : 'rgba(240,235,224,0.15)',
+              }}
+            />
+          </div>
+        ))}
+
+        {/* Human reference mark */}
+        {(() => {
+          const humanScrollPos = TOTAL_HEIGHT_PX - HUMAN_HEIGHT_M * PX_PER_METER
+          const humanY = humanScrollPos - scrollY
+          if (humanY < 0 || humanY > windowHeight) return null
+          return (
+            <div
+              style={{
+                position: 'absolute',
+                top: humanY,
+                left: 0,
+                right: 0,
+                display: 'flex',
+                alignItems: 'flex-end',
+                pointerEvents: 'none',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  height: 1,
+                  width: GAUGE_WIDTH,
+                  background: 'rgba(140, 200, 100, 0.5)',
+                }}
+              />
+              <svg
+                width="22"
+                height="44"
+                viewBox="0 0 22 60"
+                style={{ position: 'absolute', right: 22, bottom: 0 }}
+              >
+                <circle cx="11" cy="6" r="5" fill="#8fcf5a" opacity="0.8" />
+                <rect x="7" y="12" width="8" height="22" rx="2" fill="#8fcf5a" opacity="0.8" />
+                <rect x="1" y="14" width="6" height="16" rx="2" fill="#8fcf5a" opacity="0.8" />
+                <rect x="15" y="14" width="6" height="16" rx="2" fill="#8fcf5a" opacity="0.8" />
+                <rect x="7" y="34" width="5" height="18" rx="2" fill="#8fcf5a" opacity="0.8" />
+                <rect x="10" y="34" width="5" height="18" rx="2" fill="#8fcf5a" opacity="0.8" />
+              </svg>
+            </div>
+          )
+        })()}
+      </div>
+
+      {/* Zone color bar at bottom */}
+      <div
+        style={{
+          height: 3,
+          background: zone.accent,
+          transition: 'background 0.8s ease',
+          flexShrink: 0,
+        }}
+      />
+    </div>
+  )
+}
+
+function ZoneLabel({ currentZone }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 20,
+        left: GAUGE_WIDTH + 20,
+        zIndex: 99,
+        pointerEvents: 'none',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "'Fraunces', serif",
+          fontSize: 13,
+          fontStyle: 'italic',
+          color: currentZone.accent,
+          transition: 'color 0.8s ease',
+          letterSpacing: '0.02em',
+          opacity: 0.85,
+        }}
+      >
+        {currentZone.name}
+      </div>
+      <div
+        style={{
+          fontSize: 9,
+          color: 'rgba(240,235,224,0.35)',
+          fontFamily: "'DM Mono', monospace",
+          letterSpacing: '0.1em',
+          marginTop: 2,
+        }}
+      >
+        {currentZone.sub}
+      </div>
+    </div>
+  )
+}
+
+// Lane → horizontal position config
+// lane 0: left column, label right
+// lane 1: center column, label right
+// lane 2: right column, label left
+const LANE_CONFIG = [
+  { posStyle: { left: GAUGE_WIDTH + 32 },         labelAlign: 'left',  flexDir: 'row' },
+  { posStyle: { left: 'calc(33% + 60px)' },        labelAlign: 'left',  flexDir: 'row' },
+  { posStyle: { right: 32 },                        labelAlign: 'right', flexDir: 'row-reverse' },
+]
+
+function PokemonEntry({ pokemon, computedTop, lane, spriteSize }) {
+  const ref = useRef(null)
+  const [visible, setVisible] = useState(false)
+  const cfg = LANE_CONFIG[lane] ?? LANE_CONFIG[0]
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.05, rootMargin: '100px 0px 100px 0px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  const zone = getZone(pokemon.height)
+  const isLeft = cfg.flexDir === 'row'
+
+  return (
+    <div
+      ref={ref}
+      className={`pokemon-entry${visible ? ' visible' : ''}${!isLeft ? ' left' : ''}`}
+      style={{
+        position: 'absolute',
+        top: computedTop,
+        ...cfg.posStyle,
+        display: 'flex',
+        flexDirection: cfg.flexDir,
+        alignItems: 'center',
+        gap: 12,
+        animationDelay: '0.04s',
+      }}
+    >
+      <img
+        src={pokemon.sprite}
+        alt={pokemon.name}
+        className="pokemon-img"
+        style={{
+          width: spriteSize,
+          height: spriteSize,
+          objectFit: 'contain',
+          flexShrink: 0,
+          filter: 'drop-shadow(0 4px 20px rgba(0,0,0,0.55))',
+        }}
+      />
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 3,
+          textAlign: cfg.labelAlign,
+          minWidth: 0,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "'Fraunces', serif",
+            fontSize: Math.min(26, Math.max(12, spriteSize * 0.22)),
+            fontWeight: 600,
+            color: '#f0ebe0',
+            textTransform: 'capitalize',
+            letterSpacing: '-0.3px',
+            lineHeight: 1,
+            textShadow: '0 2px 8px rgba(0,0,0,0.7)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {pokemon.name}
+        </div>
+        <div
+          style={{
+            fontSize: 10,
+            fontFamily: "'DM Mono', monospace",
+            color: zone.accent,
+            letterSpacing: '0.08em',
+          }}
+        >
+          {pokemon.height} m
+        </div>
+        <div
+          style={{
+            fontSize: 9,
+            color: 'rgba(240,235,224,0.28)',
+            fontFamily: "'DM Mono', monospace",
+            letterSpacing: '0.1em',
+          }}
+        >
+          #{String(pokemon.id).padStart(3, '0')}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
-  const [pokemon, setPokemon] = useState([])
+  const [positioned, setPositioned] = useState([]) // sorted + lane-assigned positions
   const [loading, setLoading] = useState(true)
   const [progress, setProgress] = useState(0)
-  const scrollRef = useRef(null)
+  const [scrollY, setScrollY] = useState(0)
+  const [windowHeight, setWindowHeight] = useState(window.innerHeight)
+
+  useEffect(() => {
+    const onResize = () => setWindowHeight(window.innerHeight)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => {
     async function fetchAll() {
       const results = []
       const batchSize = 20
-
       for (let i = 1; i <= POKEMON_COUNT; i += batchSize) {
         const batch = Array.from(
           { length: Math.min(batchSize, POKEMON_COUNT - i + 1) },
@@ -156,7 +455,7 @@ export default function App() {
             return {
               id: data.id,
               name: data.name,
-              height: data.height / 10, // decimetres → metres
+              height: data.height / 10,
               sprite:
                 data.sprites?.other?.['official-artwork']?.front_default ||
                 data.sprites?.front_default,
@@ -166,197 +465,128 @@ export default function App() {
         results.push(...fetched)
         setProgress(Math.min(results.length, POKEMON_COUNT))
       }
-
       results.sort((a, b) => a.height - b.height)
-      setPokemon(results)
+      setPositioned(computePositions(results))
       setLoading(false)
     }
-
     fetchAll()
   }, [])
 
-  // Drag to scroll
   useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    let isDown = false
-    let startX = 0
-    let scrollLeft = 0
-
-    const onMouseDown = (e) => {
-      isDown = true
-      startX = e.pageX - el.offsetLeft
-      scrollLeft = el.scrollLeft
-      el.style.cursor = 'grabbing'
-    }
-    const onMouseUp = () => { isDown = false; el.style.cursor = 'grab' }
-    const onMouseMove = (e) => {
-      if (!isDown) return
-      e.preventDefault()
-      const x = e.pageX - el.offsetLeft
-      el.scrollLeft = scrollLeft - (x - startX)
-    }
-
-    el.addEventListener('mousedown', onMouseDown)
-    window.addEventListener('mouseup', onMouseUp)
-    el.addEventListener('mousemove', onMouseMove)
-    return () => {
-      el.removeEventListener('mousedown', onMouseDown)
-      window.removeEventListener('mouseup', onMouseUp)
-      el.removeEventListener('mousemove', onMouseMove)
-    }
+    if (loading) return
+    const onScroll = () => setScrollY(window.scrollY)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
   }, [loading])
 
-  const tallest = pokemon.length > 0 ? pokemon[pokemon.length - 1].height : 20
-  const pxPerMeter = CHART_HEIGHT_PX / (tallest * 1.15)
+  // Current height: scroll from bottom = taller pokemon further down page
+  // scrollY=0 → top of page → tiny pokemon
+  // scrollY=max → tallest pokemon
+  const maxScroll = TOTAL_HEIGHT_PX - windowHeight
+  const currentHeightM = maxScroll > 0
+    ? (scrollY / maxScroll) * MAX_HEIGHT_M
+    : 0
+  const currentZone = getZone(currentHeightM)
+
+  if (loading) return <PokeballLoader progress={progress} />
 
   return (
-    <div
-      className="flex flex-col"
-      style={{
-        height: '100vh',
-        background: 'linear-gradient(to bottom, #bfdbfe 0%, #ddd6fe 60%, #c7d2fe 100%)',
-      }}
-    >
-      {/* Header */}
-      <header
-        className="flex items-center justify-between px-8 shrink-0"
+    <div style={{ position: 'relative' }}>
+      {/* Fixed gauge */}
+      <HeightGauge scrollY={scrollY} currentHeightM={currentHeightM} windowHeight={windowHeight} />
+
+      {/* Fixed zone label */}
+      <ZoneLabel currentZone={currentZone} />
+
+      {/* Fixed title */}
+      <div
         style={{
-          height: HEADER_HEIGHT_PX,
-          background: 'rgba(255,255,255,0.55)',
-          backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(255,255,255,0.6)',
-          boxShadow: '0 1px 8px rgba(167,139,250,0.12)',
+          position: 'fixed',
+          top: 16,
+          right: 24,
+          zIndex: 99,
+          textAlign: 'right',
+          pointerEvents: 'none',
         }}
       >
-        <div className="flex items-center gap-3">
-          <span
-            style={{
-              fontSize: 22,
-              fontWeight: 800,
-              background: 'linear-gradient(to right, #7c3aed, #ec4899)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              letterSpacing: '-0.5px',
-            }}
-          >
-            PokéSize ✨
-          </span>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: '#7c3aed',
-              background: '#ede9fe',
-              borderRadius: 99,
-              padding: '2px 10px',
-              letterSpacing: '0.05em',
-            }}
-          >
-            Gen I
-          </span>
-        </div>
-        {!loading && (
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: '#7c3aed',
-              background: 'rgba(237,233,254,0.8)',
-              borderRadius: 99,
-              padding: '4px 12px',
-            }}
-          >
-            Scroll → to see taller Pokémon · Drag to pan
-          </span>
-        )}
-      </header>
-
-      {/* Main */}
-      {loading ? (
-        <PokeballLoader progress={progress} />
-      ) : (
         <div
-          ref={scrollRef}
-          className="scroll-container flex-1 select-none"
-          style={{ cursor: 'grab' }}
+          style={{
+            fontFamily: "'Fraunces', serif",
+            fontSize: 17,
+            fontWeight: 700,
+            color: '#f0ebe0',
+            letterSpacing: '-0.3px',
+          }}
         >
-          <div
-            className="flex items-end relative"
-            style={{
-              height: CHART_HEIGHT_PX + GROUND_PADDING_PX,
-              paddingLeft: 24,
-              paddingRight: 48,
-              paddingBottom: GROUND_PADDING_PX,
-            }}
-          >
-            {/* Grass ground */}
-            <div
-              className="absolute bottom-0 left-0 right-0"
-              style={{
-                height: GROUND_PADDING_PX,
-                background: 'linear-gradient(to top, #86efac, #bbf7d0)',
-                borderTop: '3px solid #4ade80',
-              }}
-            />
-
-            {/* Height grid lines */}
-            {[1, 2, 5, 10, 15].map((m) => {
-              const y = CHART_HEIGHT_PX - m * pxPerMeter
-              if (y < 0) return null
-              return (
-                <div
-                  key={m}
-                  className="absolute left-0 right-0 flex items-center"
-                  style={{ bottom: GROUND_PADDING_PX + m * pxPerMeter }}
-                >
-                  <div
-                    className="w-full"
-                    style={{ borderTop: '1px dashed rgba(99,102,241,0.18)' }}
-                  />
-                  <span
-                    style={{
-                      position: 'absolute',
-                      left: 6,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: '#6d28d9',
-                      background: 'rgba(255,255,255,0.75)',
-                      borderRadius: 99,
-                      padding: '1px 6px',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.07)',
-                    }}
-                  >
-                    {m}m
-                  </span>
-                </div>
-              )
-            })}
-
-            {/* Human reference */}
-            <div className="mr-4 shrink-0 relative z-10">
-              <HumanSilhouette pxPerMeter={pxPerMeter} />
-            </div>
-
-            {/* Divider */}
-            <div
-              className="shrink-0 mr-4"
-              style={{
-                width: 1,
-                height: CHART_HEIGHT_PX,
-                background: 'rgba(124,58,237,0.15)',
-              }}
-            />
-
-            {/* Pokémon */}
-            {pokemon.map((p) => (
-              <div key={p.id} className="mx-1 shrink-0 relative z-10" style={{ overflow: 'visible' }}>
-                <PokemonCard pokemon={p} pxPerMeter={pxPerMeter} />
-              </div>
-            ))}
-          </div>
+          PokéSize
         </div>
-      )}
+        <div style={{ fontSize: 9, color: 'rgba(240,235,224,0.3)', fontFamily: "'DM Mono', monospace", letterSpacing: '0.1em', marginTop: 2 }}>
+          GEN I · SCROLL TO EXPLORE
+        </div>
+      </div>
+
+      {/* Scroll container */}
+      <div
+        style={{
+          position: 'relative',
+          height: TOTAL_HEIGHT_PX,
+          width: '100%',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Zone background bands */}
+        {ZONES.map((zone) => (
+          <div
+            key={zone.name}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: (zone.min / MAX_HEIGHT_M) * TOTAL_HEIGHT_PX,
+              height: ((zone.max - zone.min) / MAX_HEIGHT_M) * TOTAL_HEIGHT_PX,
+              background: zone.bg,
+            }}
+          />
+        ))}
+
+        {/* Subtle horizontal grid lines at each meter */}
+        {Array.from({ length: MAX_HEIGHT_M + 1 }, (_, m) => (
+          <div
+            key={m}
+            style={{
+              position: 'absolute',
+              left: GAUGE_WIDTH,
+              right: 0,
+              top: (m / MAX_HEIGHT_M) * TOTAL_HEIGHT_PX,
+              height: 1,
+              background: 'rgba(255,255,255,0.04)',
+            }}
+          />
+        ))}
+
+        {/* Ground line */}
+        <div
+          style={{
+            position: 'absolute',
+            left: GAUGE_WIDTH,
+            right: 0,
+            bottom: 0,
+            height: 3,
+            background: 'rgba(160, 118, 74, 0.4)',
+          }}
+        />
+
+        {/* Pokémon entries */}
+        {positioned.map((p) => (
+          <PokemonEntry
+            key={p.id}
+            pokemon={p}
+            computedTop={p.computedTop}
+            lane={p.lane}
+            spriteSize={p.spriteSize}
+          />
+        ))}
+      </div>
     </div>
   )
 }

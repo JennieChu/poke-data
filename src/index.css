@@ -6,49 +6,101 @@
   padding: 0;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background-color: #bfdbfe;
-  color: #1e293b;
-  font-family: 'Nunito', 'Segoe UI', sans-serif;
-  overflow: hidden;
-  height: 100vh;
+  background-color: #1a1209;
+  color: #f0ebe0;
+  font-family: 'DM Mono', 'Courier New', monospace;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 #root {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.scroll-container {
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: #c4b5fd #e0e7ff;
-}
-
-.scroll-container::-webkit-scrollbar {
-  height: 8px;
-}
-
-.scroll-container::-webkit-scrollbar-track {
-  background: #e0e7ff;
-}
-
-.scroll-container::-webkit-scrollbar-thumb {
-  background: #c4b5fd;
-  border-radius: 4px;
+  min-height: 100vh;
 }
 
 .pokemon-img {
   image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
+/* Entry animation for pokemon cards */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeSlideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.pokemon-entry {
+  opacity: 0;
+}
+
+.pokemon-entry.visible {
+  animation: fadeSlideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.pokemon-entry.visible.left {
+  animation-name: fadeSlideInLeft;
+}
+
+/* Loader bounce */
 @keyframes bounce-load {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
+  50% { transform: translateY(-14px); }
 }
 
 .bounce-load {
-  animation: bounce-load 0.8s ease-in-out infinite;
+  animation: bounce-load 0.9s ease-in-out infinite;
+}
+
+/* Gauge */
+.gauge-tick {
+  position: absolute;
+  right: 0;
+  height: 1px;
+  background: rgba(240, 235, 224, 0.25);
+  transform: translateY(-50%);
+}
+
+.gauge-tick-major {
+  background: rgba(240, 235, 224, 0.55);
+  width: 16px;
+}
+
+.gauge-tick-minor {
+  width: 8px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(240, 235, 224, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(240, 235, 224, 0.4);
 }
